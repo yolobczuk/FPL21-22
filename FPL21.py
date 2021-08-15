@@ -186,6 +186,7 @@ def init_picks(GW):
             print('Query failed: %s; continuing' % (str(err)))
     transfers.columns = ['gw', 'id', 'cost']
     try:
+        cur.execute("DELETE FROM transfer_history WHERE gw = " + str(GW))
         transfers.to_sql('transfer_history', con=con, if_exists='append', index=False)
     except Exception as err:
         print('Query failed: %s; continuing' % (str(err)))
@@ -218,7 +219,7 @@ def write_summary(GW):
     print(captain)
     
     
-def init_stats(ver = 'season', GW):
+def init_stats(ver = 'season', GW = None):
     if(ver == 'season'):
         info = pd.read_sql("SELECT * FROM player_info", con = con)
     else:
@@ -253,20 +254,73 @@ def init_stats(ver = 'season', GW):
             summ.to_csv('stat_gw.csv', mode='a', index=False, encoding='utf-8-sig')
         except Exception as err:
             print('Query failed: %s; continuing' % (str(err)))
+        print("GW " + str(GW) + " STATS")
+        print(summ)
     else:
         summ = summ[['total','next','leader','transfers','captain','bench','value']]
         summ.to_csv('stat_season.csv', index=False, encoding='utf-8-sig')
+        print("SEASON STATS")
+        print(summ)
         
 def export_picks():
     info = pd.read_sql("SELECT * FROM player_info", con = con)
+    positions = pd.read_sql("SELECT * FROM positions", con = con).set_index('id')
+    teams = pd.read_sql("SELECT * FROM teams", con = con).set_index('id')
+    
     info['against'] = info.against.map(teams.name)
     info['team'] = info.team.map(teams.name)
     info['element_type'] = info.element_type.map(positions.name)
     info['mult_points'] = info['mult']*info['points']
     info[info['mult']>0].to_csv('data.csv', index=False, encoding='utf-8-sig')
     
-def print_means():
-
+def print_means(GW):
+    info = pd.read_sql("SELECT * FROM player_info", con = con)
+    positions = pd.read_sql("SELECT * FROM positions", con = con).set_index('id')
+    teams = pd.read_sql("SELECT * FROM teams", con = con).set_index('id')
+    
+    info['against'] = info.against.map(teams.name)
+    info['team'] = info.team.map(teams.name)
+    info['element_type'] = info.element_type.map(positions.name)
+    info['mult_points'] = info['mult']*info['points']
+    print("POINT MEANS, BY NAME")
+    print(info[['web_name','mult_points']].groupby(['web_name']).mean().sort_values(by = 'mult_points', ascending = False).head(10))
+    
+    print("POINT MEANS, BY POSITION")
+    print(info[['element_type','mult_points']].groupby(['element_type']).mean().sort_values(by = 'mult_points', ascending = False).head(10))
+    
+    print("POINT MEANS, BY TEAM")
+    print(info[['team','mult_points']].groupby(['team']).mean().sort_values(by = 'mult_points', ascending = False).head(10))
+    
+    print("POINT MEANS, BY AGAINST")
+    print(info[['against','mult_points']].groupby(['against']).mean().sort_values(by = 'mult_points', ascending = False).head(10))
+    
+def print_counts(ver = 'season', GW = None):
+    if(ver == 'season'):
+        info = pd.read_sql("SELECT * FROM player_info", con = con)
+        print("SEASON COUNTS")
+    else:
+        info = pd.read_sql("SELECT * FROM player_info WHERE gw = " + str(GW), con = con)
+        print("GW " + str(GW) +" COUNTS")
+    positions = pd.read_sql("SELECT * FROM positions", con = con).set_index('id')
+    teams = pd.read_sql("SELECT * FROM teams", con = con).set_index('id')
+    
+    info['against'] = info.against.map(teams.name)
+    info['team'] = info.team.map(teams.name)
+    info['element_type'] = info.element_type.map(positions.name)
+    info['mult_points'] = info['mult']*info['points']
+    
+    print("COUNTS, BY NAME")
+    print(info[['web_name','mult_points']].groupby(['web_name']).count().sort_values(by = 'mult_points', ascending = False).head(10))
+    
+    print("COUNTS, BY POSITION")
+    print(info[['element_type','mult_points']].groupby(['element_type']).count().sort_values(by = 'mult_points', ascending = False).head(10))
+    
+    print("COUNTS, BY TEAM")
+    print(info[['team','mult_points']].groupby(['team']).count().sort_values(by = 'mult_points', ascending = False).head(10))
+    
+    print("COUNTS, BY AGAINST")
+    print(info[['against','mult_points']].groupby(['against']).count().sort_values(by = 'mult_points', ascending = False).head(10))
+    
     
 OK = True
 
@@ -278,7 +332,13 @@ while OK:
     print("4. Show databases")
     print("5. Refresh attributes")
     print("6. Initialize picks")
-    print("7. Write summary")
+    print("7. Print summary")
+    print("8. Print means")    
+    print("9. Print counts")  
+    print("10. Initialize gw stats")
+    print("11. Initialize season stats")
+    print("12. Export data")
+    
     print("0. Exit")
     wybor = input("Pick a number: ")
 
@@ -308,85 +368,25 @@ while OK:
 
     elif wybor == '8':
         GW = int(input("Pick GW: "))
-        init_player_info(GW)
-        print(pd.read_sql("SELECT * FROM player_info", con = con))
+        print_means(GW)
 
     elif wybor == '9':
-        cur.execute("DELETE FROM attributes")
-        con.commit()
+        GW = int(input("Pick GW: "))
+        ver = input("Choose version (season/gw): ")
+        print_counts(ver, GW)
 
     elif wybor == '10':
-        GW = input("Pick GW: ")
-        cap_df = pd.read_sql("SELECT element, name FROM captains WHERE gw = " + str(GW), con)
-        with pd.option_context('display.max_rows', None, 'display.max_columns', None):
-            print(cap_df)
+        GW = int(input("Pick GW: "))
+        init_stats('gw',GW)
 
     elif wybor == '11':
-        GW = int(input("Pick GW: "))
-        show_plots(GW)   
+        init_stats('season')   
 
     elif wybor == '12':
-        GW = int(input("Pick GW: "))
-        init_pred(GW)
-
-    elif wybor == '13':
-        GW = input("Pick GW: ")
-        init_picks(GW)
-
-    elif wybor == '14':
-        GW = input("Pick GW: ")
-        overwrite_pilkarzyki(GW)
-        show_pilkarzyki(GW)
-
-    elif wybor == '15':
-        show_picks()
-            
-    elif wybor == '16':
-        GW = input("Pick GW: ")
-        show_pilkarzyki(GW)
-    
-    elif wybor == '17':
-        pok = True
-        GW = input("Pick GW: ")
-        while pok:
-            potw = input("This function overwrites players info in database. Do you want to continue? Y/N ")
-            if potw == "Y":
-                init_pilkarzyki(GW)
-                pok = False
-            elif potw == "N":
-                print("Database not updated")
-                pok = False
-            else:
-                print("Y/N")
-
-    elif wybor == '18':
-        pok = True
-        while pok:
-            potw = input("This function overwrites manager info in database. Do you want to continue? Y/N ")
-            if potw == "Y":
-                init_gracze()
-                pok = False
-            elif potw == "N":
-                print("Database not updated")
-                pok = False
-            else:
-                print("Y/N")
-    
-    elif wybor == '19':
-        pok = True
-        while pok:
-            potw = input("This function overwrites databases. Do you want to continue? Y/N (NOT RECOMMENDED)")
-            if potw == "Y":
-                init_db()
-                pok = False
-            elif potw == "N":
-                print("Databeses not updated")
-                pok = False
-            else:
-                print("Y/N")
+        export_picks()
 
     elif wybor == 'D':
-        print(pd.read_sql("SELECT * FROM pilkarzyki WHERE gw = 38", con))
+        print(pd.read_sql("SELECT * FROM transfer_history",con=con))
 
     elif wybor == '0':
         print("EXIT")
