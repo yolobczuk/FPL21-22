@@ -248,22 +248,22 @@ def init_stats(ver = 'season', GW = None):
     if(ver == 'gw'):
         summ['gw'] = GW
         summ = summ[['gw','total','next','leader','transfers','captain','bench','value']]
+        summ.to_csv('stat_gw.csv', index=True, encoding='utf-8-sig')
         try:
             cur.execute("DELETE FROM stat WHERE gw = " + str(GW))
             summ.to_sql('stat', con=con, if_exists='append', index=False)
-            summ.to_csv('stat_gw.csv', mode='a', index=False, encoding='utf-8-sig')
         except Exception as err:
             print('Query failed: %s; continuing' % (str(err)))
         print("GW " + str(GW) + " STATS")
         print(summ)
     else:
         summ = summ[['total','next','leader','transfers','captain','bench','value']]
-        summ.to_csv('stat_season.csv', index=False, encoding='utf-8-sig')
+        summ.to_csv('stat_season.csv', index=True, encoding='utf-8-sig')
         print("SEASON STATS")
         print(summ)
         
 def export_picks():
-    info = pd.read_sql("SELECT * FROM player_info", con = con)
+    info = pd.read_sql("SELECT * FROM player_info WHERE mult > 0", con = con)
     positions = pd.read_sql("SELECT * FROM positions", con = con).set_index('id')
     teams = pd.read_sql("SELECT * FROM teams", con = con).set_index('id')
     
@@ -272,9 +272,10 @@ def export_picks():
     info['element_type'] = info.element_type.map(positions.name)
     info['mult_points'] = info['mult']*info['points']
     info[info['mult']>0].to_csv('data.csv', index=False, encoding='utf-8-sig')
+    info[info['mult']>1].to_csv('captains.csv', index=False, encoding='utf-8-sig')
     
 def print_means(GW):
-    info = pd.read_sql("SELECT * FROM player_info", con = con)
+    info = pd.read_sql("SELECT * FROM player_info WHERE mult > 0", con = con)
     positions = pd.read_sql("SELECT * FROM positions", con = con).set_index('id')
     teams = pd.read_sql("SELECT * FROM teams", con = con).set_index('id')
     
@@ -296,10 +297,10 @@ def print_means(GW):
     
 def print_counts(ver = 'season', GW = None):
     if(ver == 'season'):
-        info = pd.read_sql("SELECT * FROM player_info", con = con)
+        info = pd.read_sql("SELECT * FROM player_info WHERE mult > 0", con = con)
         print("SEASON COUNTS")
     else:
-        info = pd.read_sql("SELECT * FROM player_info WHERE gw = " + str(GW), con = con)
+        info = pd.read_sql("SELECT * FROM player_info WHERE mult > 0 AND gw = " + str(GW), con = con)
         print("GW " + str(GW) +" COUNTS")
     positions = pd.read_sql("SELECT * FROM positions", con = con).set_index('id')
     teams = pd.read_sql("SELECT * FROM teams", con = con).set_index('id')
