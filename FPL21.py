@@ -160,7 +160,7 @@ def refresh_attributes(GW):
         
 def init_picks(GW):
     refresh_attributes(GW)
-    attributes = pd.read_sql("SELECT * FROM attributes", con = con)
+    attributes = pd.read_sql("SELECT * FROM attributes WHERE gw = " + str(GW), con = con)
     managers = pd.read_sql("SELECT * FROM managers", con = con)
     transfers = pd.DataFrame()
     try:
@@ -179,38 +179,39 @@ def init_picks(GW):
         picks['ent_id'] = i
         picks = picks[['gw','ent_id','element','multiplier','event_points']]
         picks.columns = ['gw','ent_id','el_id','mult','points']
-        transfers = transfers.append([[1, i, json['entry_history']['event_transfers_cost']]])
+        transfers = transfers.append([[GW, i, json['entry_history']['event_transfers_cost']]])
         try:
             picks.to_sql('picks', con=con, if_exists='append', index=False)
         except Exception as err:
-            print('Query failed: %s; continuing' % (str(err)))
+            print('Query failed II: %s; continuing' % (str(err)))
     transfers.columns = ['gw', 'id', 'cost']
     try:
         cur.execute("DELETE FROM transfer_history WHERE gw = " + str(GW))
+        con.commit()
         transfers.to_sql('transfer_history', con=con, if_exists='append', index=False)
     except Exception as err:
         print('Query failed: %s; continuing' % (str(err)))
             
 def init_player_info(GW):
-    init_picks(GW)
+    #init_picks(GW)
     try:
         cur.execute("DROP VIEW player_info")
     except Exception as err:
         print('Query failed: %s; continuing' % (str(err)))
-    cur.execute("CREATE VIEW player_info AS SELECT ent_id, p.gw, name, club, mult, points, value, against, pl.web_name, team, element_type FROM picks p INNER JOIN managers m ON m.id = p.ent_id INNER JOIN attributes a ON a.id = p.el_id INNER JOIN players pl ON a.id = pl.id WHERE p.gw = " + str(GW))
+    cur.execute("CREATE VIEW player_info AS SELECT ent_id, p.gw, name, club, mult, points, value, a.against, pl.web_name, team, element_type FROM picks p INNER JOIN managers m ON m.id = p.ent_id INNER JOIN attributes a ON a.id = p.el_id AND a.gw = p.gw INNER JOIN players pl ON a.id = pl.id")
     
 def write_summary(GW):
     init_player_info(GW)
-    info = pd.read_sql("SELECT * FROM player_info", con = con)
+    info = pd.read_sql("SELECT * FROM player_info WHERE gw = " + str(GW), con = con)
     managers = pd.read_sql("SELECT * FROM managers", con = con)
     captain = info[info['mult']>=2][['name','web_name']]
     summary = pd.DataFrame()
     for i in range(len(managers['id'])):
-        url = 'https://fantasy.premierleague.com/api/entry/' + str(managers['id'][i]) + '/event/' + str(1) + '/picks/'
+        url = 'https://fantasy.premierleague.com/api/entry/' + str(managers['id'][i]) + '/event/' + str(GW) + '/picks/'
         r = requests.get(url)
         json = r.json()
         chips = json['active_chip']
-        transfers = -json['entry_history']['event_transfers']
+        transfers = -json['entry_history']['event_transfers_cost']
         add = [[managers['name'][i], chips, transfers]]
         summary = summary.append(add)
     summary.columns = ['name','active_chip','transfer_cost']
@@ -237,7 +238,7 @@ def init_stats(ver = 'season', GW = None):
     c = pd.pivot_table(info[info['mult']>=2], values='mult_points', index=['name','club'], aggfunc=np.sum).sort_values(by='mult_points', ascending=False)
     v = pd.pivot_table(info, values='value', index=['name','club'], aggfunc=np.sum).sort_values(by='value', ascending=False)
     t = pd.read_sql("SELECT t.gw, m.name, m.club, t.cost FROM managers m INNER JOIN transfer_history t ON t.id = m.id",con=con).set_index(['name','club'])
-    t = t.cost.cumsum()
+    t = t.cost.groupby(['name','club']).sum()
     
     summ = pd.concat([fs, b, c, v, t], axis=1)
     summ.columns = ['total','bench','captain','value','transfers']
@@ -248,7 +249,7 @@ def init_stats(ver = 'season', GW = None):
     if(ver == 'gw'):
         summ['gw'] = GW
         summ = summ[['gw','total','next','leader','transfers','captain','bench','value']]
-        summ.to_csv('stat_gw.csv', index=True, encoding='utf-8-sig')
+        summ.to_csv('stat_gw.csv', index=True, mode = 'a', encoding='utf-8-sig')
         try:
             cur.execute("DELETE FROM stat WHERE gw = " + str(GW))
             summ.to_sql('stat', con=con, if_exists='append', index=False)
@@ -274,7 +275,7 @@ def export_picks():
     info[info['mult']>0].to_csv('data.csv', index=False, encoding='utf-8-sig')
     info[info['mult']>1].to_csv('captains.csv', index=False, encoding='utf-8-sig')
     
-def print_means(GW):
+def print_means():
     info = pd.read_sql("SELECT * FROM player_info WHERE mult > 0", con = con)
     positions = pd.read_sql("SELECT * FROM positions", con = con).set_index('id')
     teams = pd.read_sql("SELECT * FROM teams", con = con).set_index('id')
@@ -368,8 +369,7 @@ while OK:
         write_summary(GW)
 
     elif wybor == '8':
-        GW = int(input("Pick GW: "))
-        print_means(GW)
+        print_means()
 
     elif wybor == '9':
         GW = int(input("Pick GW: "))
@@ -385,9 +385,15 @@ while OK:
 
     elif wybor == '12':
         export_picks()
+        
+    elif wybor == '13':
+        GW = int(input("Pick GW: "))
 
     elif wybor == 'D':
-        print(pd.read_sql("SELECT * FROM transfer_history",con=con))
+        print(pd.read_sql("SELECT * FROM attributes",con=con))
+        
+    elif wybor == 'E':
+        print(pd.read_sql("SELECT * FROM picks",con=con))
 
     elif wybor == '0':
         print("EXIT")
