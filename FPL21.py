@@ -193,7 +193,9 @@ def init_picks(GW):
         print('Query failed: %s; continuing' % (str(err)))
             
 def init_player_info(GW):
-    #init_picks(GW)
+    choice = input("Do you want to initialize picks? Y/N ")
+    if choice == 'Y':
+        init_picks(GW)
     try:
         cur.execute("DROP VIEW player_info")
     except Exception as err:
@@ -236,7 +238,7 @@ def init_stats(ver = 'season', GW = None):
     fs = pd.pivot_table(info[info['mult']>0], values='mult_points', index=['name','club'], aggfunc=np.sum).sort_values(by='mult_points', ascending=False)
     b = pd.pivot_table(info[info['mult']==0], values='points', index=['name','club'], aggfunc=np.sum).sort_values(by='points', ascending=False)
     c = pd.pivot_table(info[info['mult']>=2], values='mult_points', index=['name','club'], aggfunc=np.sum).sort_values(by='mult_points', ascending=False)
-    v = pd.pivot_table(info, values='value', index=['name','club'], aggfunc=np.sum).sort_values(by='value', ascending=False)
+    v = pd.pivot_table(info[info['gw']==GW], values='value', index=['name','club'], aggfunc=np.sum).sort_values(by='value', ascending=False)
     t = pd.read_sql("SELECT t.gw, m.name, m.club, t.cost FROM managers m INNER JOIN transfer_history t ON t.id = m.id",con=con).set_index(['name','club'])
     t = t.cost.groupby(['name','club']).sum()
     
@@ -249,7 +251,9 @@ def init_stats(ver = 'season', GW = None):
     if(ver == 'gw'):
         summ['gw'] = GW
         summ = summ[['gw','total','next','leader','transfers','captain','bench','value']]
-        summ.to_csv('stat_gw.csv', index=True, mode = 'a', encoding='utf-8-sig')
+        choice = input("Do you want to save to CSV? Y/N ")
+        if choice == 'Y':
+            summ.to_csv('stat_gw.csv', index=True, mode = 'a', encoding='utf-8-sig')
         try:
             cur.execute("DELETE FROM stat WHERE gw = " + str(GW))
             summ.to_sql('stat', con=con, if_exists='append', index=False)
@@ -259,7 +263,9 @@ def init_stats(ver = 'season', GW = None):
         print(summ)
     else:
         summ = summ[['total','next','leader','transfers','captain','bench','value']]
-        summ.to_csv('stat_season.csv', index=True, encoding='utf-8-sig')
+        choice = input("Do you want to save to CSV? Y/N ")
+        if choice == 'Y':
+            summ.to_csv('stat_season.csv', index=True, encoding='utf-8-sig')
         print("SEASON STATS")
         print(summ)
         
@@ -296,11 +302,12 @@ def print_means():
     print("POINT MEANS, BY AGAINST")
     print(info[['against','mult_points']].groupby(['against']).mean().sort_values(by = 'mult_points', ascending = False).head(10))
     
-def print_counts(ver = 'season', GW = None):
+def print_counts(ver = 'season'):
     if(ver == 'season'):
         info = pd.read_sql("SELECT * FROM player_info WHERE mult > 0", con = con)
         print("SEASON COUNTS")
     else:
+        GW = int(input("Pick GW: "))
         info = pd.read_sql("SELECT * FROM player_info WHERE mult > 0 AND gw = " + str(GW), con = con)
         print("GW " + str(GW) +" COUNTS")
     positions = pd.read_sql("SELECT * FROM positions", con = con).set_index('id')
@@ -372,16 +379,16 @@ while OK:
         print_means()
 
     elif wybor == '9':
-        GW = int(input("Pick GW: "))
         ver = input("Choose version (season/gw): ")
-        print_counts(ver, GW)
+        print_counts(ver)
 
     elif wybor == '10':
         GW = int(input("Pick GW: "))
         init_stats('gw',GW)
 
     elif wybor == '11':
-        init_stats('season')   
+        GW = int(input("What is current GW? "))
+        init_stats('season', GW)   
 
     elif wybor == '12':
         export_picks()
