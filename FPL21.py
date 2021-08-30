@@ -325,10 +325,10 @@ def print_counts(ver = 'season'):
     print(info[['element_type','mult_points']].groupby(['element_type']).count().sort_values(by = 'mult_points', ascending = False).head(10))
     
     print("COUNTS, BY TEAM")
-    print(info[['team','mult_points']].groupby(['team']).count().sort_values(by = 'mult_points', ascending = False).head(10))
+    print(info[['team','mult_points']].groupby(['team']).count().sort_values(by = 'mult_points', ascending = False))
     
     print("COUNTS, BY AGAINST")
-    print(info[['against','mult_points']].groupby(['against']).count().sort_values(by = 'mult_points', ascending = False).head(10))
+    print(info[['against','mult_points']].groupby(['against']).count().sort_values(by = 'mult_points', ascending = False))
     
     
 OK = True
