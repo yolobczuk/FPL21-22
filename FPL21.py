@@ -159,7 +159,9 @@ def refresh_attributes(GW):
         print('Query failed: %s; continuing' % (str(err)))
         
 def init_picks(GW):
-    refresh_attributes(GW)
+    choice = input("Do you want to refresh attributes? Y/N ")
+    if choice == 'Y':
+        refresh_attributes(GW)
     attributes = pd.read_sql("SELECT * FROM attributes WHERE gw = " + str(GW), con = con)
     managers = pd.read_sql("SELECT * FROM managers", con = con)
     transfers = pd.DataFrame()
@@ -402,6 +404,9 @@ while OK:
     elif wybor == 'E':
         print(pd.read_sql("SELECT * FROM picks",con=con))
 
+    elif wybor == 'M':
+        print(pd.read_sql("SELECT * FROM managers",con=con))
+        
     elif wybor == '0':
         print("EXIT")
         OK = False
