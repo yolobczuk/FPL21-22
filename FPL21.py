@@ -241,7 +241,10 @@ def init_stats(ver = 'season', GW = None):
     b = pd.pivot_table(info[info['mult']==0], values='points', index=['name','club'], aggfunc=np.sum).sort_values(by='points', ascending=False)
     c = pd.pivot_table(info[info['mult']>=2], values='mult_points', index=['name','club'], aggfunc=np.sum).sort_values(by='mult_points', ascending=False)
     v = pd.pivot_table(info[info['gw']==GW], values='value', index=['name','club'], aggfunc=np.sum).sort_values(by='value', ascending=False)
-    t = pd.read_sql("SELECT t.gw, m.name, m.club, t.cost FROM managers m INNER JOIN transfer_history t ON t.id = m.id",con=con).set_index(['name','club'])
+    if(ver == 'season'):
+        t = pd.read_sql("SELECT t.gw, m.name, m.club, t.cost FROM managers m INNER JOIN transfer_history t ON t.id = m.id",con=con).set_index(['name','club'])
+    else:
+        t = pd.read_sql("SELECT t.gw, m.name, m.club, t.cost FROM managers m INNER JOIN transfer_history t ON t.id = m.id WHERE t.gw = "+str(GW),con=con).set_index(['name','club'])
     t = t.cost.groupby(['name','club']).sum()
     
     summ = pd.concat([fs, b, c, v, t], axis=1)
@@ -255,7 +258,7 @@ def init_stats(ver = 'season', GW = None):
         summ = summ[['gw','total','next','leader','transfers','captain','bench','value']]
         choice = input("Do you want to save to CSV? Y/N ")
         if choice == 'Y':
-            summ.to_csv('stat_gw.csv', index=True, mode = 'a', encoding='utf-8-sig')
+            summ.to_csv('stat_gw.csv', index=True, mode = 'a', encoding='utf-8-sig',decimal=',', header = False, sep=";")
         try:
             cur.execute("DELETE FROM stat WHERE gw = " + str(GW))
             summ.to_sql('stat', con=con, if_exists='append', index=False)
@@ -267,7 +270,7 @@ def init_stats(ver = 'season', GW = None):
         summ = summ[['total','next','leader','transfers','captain','bench','value']]
         choice = input("Do you want to save to CSV? Y/N ")
         if choice == 'Y':
-            summ.to_csv('stat_season.csv', index=True, encoding='utf-8-sig')
+            summ.to_csv('stat_season.csv', index=True, encoding='utf-8-sig', decimal=',', sep=";")
         print("SEASON STATS")
         print(summ)
         
@@ -280,8 +283,8 @@ def export_picks():
     info['team'] = info.team.map(teams.name)
     info['element_type'] = info.element_type.map(positions.name)
     info['mult_points'] = info['mult']*info['points']
-    info[info['mult']>0].to_csv('data.csv', index=False, encoding='utf-8-sig')
-    info[info['mult']>1].to_csv('captains.csv', index=False, encoding='utf-8-sig')
+    info[info['mult']>0].to_csv('data.csv', index=False, encoding='utf-8-sig',decimal=',', sep=";")
+    info[info['mult']>1].to_csv('captains.csv', index=False, encoding='utf-8-sig', decimal=',', sep=";")
     
 def print_means():
     info = pd.read_sql("SELECT * FROM player_info WHERE mult > 0", con = con)
@@ -406,6 +409,12 @@ while OK:
 
     elif wybor == 'M':
         print(pd.read_sql("SELECT * FROM managers",con=con))
+        
+    elif wybor == 'S':
+        cur.execute('DROP TABLE stat')
+        con.commit()
+        cur.execute('CREATE TABLE IF NOT EXISTS stat(name VARCHAR, club VARCHAR, gw INTEGER, total INTEGER, transfers INTEGER, capt INTEGER, bench INTEGER, value FLOAT, CONSTRAINT PK_stat PRIMARY KEY(gw, name, club))')
+        con.commit()
         
     elif wybor == '0':
         print("EXIT")
